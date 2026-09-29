@@ -1,0 +1,820 @@
+================================================================================
+AZURE COSMOS DB PARTITION KEY DESIGN STUDY
+STEP 04–14 EXPERIMENT & AZURE SETUP GUIDE
+================================================================================
+
+Project ID : 24CC3046-P082
+Category   : Database Design
+Technology : Azure Cosmos DB for NoSQL
+Application: PhishGuard AI
+
+Repository:
+Azure-Table-or-Cosmos-DB-Partition-Key-Design-Study
+
+================================================================================
+1. PURPOSE OF THIS DOCUMENT
+================================================================================
+
+This document records the implementation and experimental workflow used for
+Steps 04–14 of the Azure Cosmos DB Partition Key Design Study.
+
+It also provides a reproducible Azure Cosmos DB setup procedure for team
+members who need to recreate the experimental environment.
+
+The project studies how partition-key design affects workload distribution,
+resource consumption, latency, and the risk of hot partitions.
+
+Core methodology:
+
+        DATA
+          |
+        ACCESS
+          |
+         KEY
+          |
+        LOAD
+          |
+         HOT
+          |
+       OPTIMIZE
+
+
+================================================================================
+2. EXPERIMENTAL APPLICATION
+================================================================================
+
+PhishGuard AI is used as the realistic application workload source.
+
+PhishGuard AI is a phishing URL detection application that processes URLs and
+stores scan results.
+
+Relevant Cosmos DB document fields include:
+
+    userId
+    url
+    verdict
+    confidenceScore
+    riskBand
+    country
+    explanation
+    scannedAt
+
+The purpose of using PhishGuard AI is to obtain realistic data and access
+patterns instead of relying only on an artificial database workload.
+
+The primary subject of this project remains Cosmos DB partition-key design.
+
+
+================================================================================
+3. ACCESS PATTERNS
+================================================================================
+
+Three important application access patterns were identified.
+
+ACCESS PATTERN 1
+----------------
+Purpose:
+    Retrieve a user's scan history.
+
+Candidate partition key:
+    /userId
+
+
+ACCESS PATTERN 2
+----------------
+Purpose:
+    Security dashboard filtering/grouping by risk level.
+
+Candidate partition key:
+    /riskBand
+
+
+ACCESS PATTERN 3
+----------------
+Purpose:
+    Regional analytics.
+
+Candidate partition key:
+    /country
+
+
+IMPORTANT:
+
+These are candidate partition-key designs.
+
+A partition key should not be selected only because a field has high
+cardinality. Application access patterns, data distribution, workload
+distribution, RU consumption, latency, and hot-partition risk must also
+be considered.
+
+
+================================================================================
+4. STEP 04 — IDENTIFY APPLICATION ACCESS PATTERNS
+================================================================================
+
+The first stage was to identify how the application actually accesses data.
+
+The identified patterns were:
+
+    User scan history       -> /userId
+    Risk-based dashboard    -> /riskBand
+    Regional analytics      -> /country
+
+This establishes the relationship between application behavior and possible
+partition-key fields.
+
+
+================================================================================
+5. STEP 05 — CANDIDATE PARTITION KEYS
+================================================================================
+
+The following fields were selected as candidate partition-key fields:
+
+    /userId
+    /riskBand
+    /country
+
+The initial experimental container uses:
+
+    /userId
+
+Reason:
+
+User scan history represents a direct and important application access
+pattern and allows the workload to be intentionally distributed and skewed
+across users for experimentation.
+
+
+================================================================================
+6. STEP 06 — CARDINALITY AND DISTRIBUTION
+================================================================================
+
+The initial dataset contains approximately 1,000 scan records distributed
+across 20 users.
+
+The user distribution was intentionally varied rather than making every
+user have exactly the same number of records.
+
+Observed user distribution:
+
+    user-001 : 56
+    user-002 : 41
+    user-003 : 52
+    user-004 : 55
+    user-005 : 37
+    user-006 : 47
+    user-007 : 50
+    user-008 : 54
+    user-009 : 64
+    user-010 : 48
+    user-011 : 54
+    user-012 : 49
+    user-013 : 59
+    user-014 : 38
+    user-015 : 49
+    user-016 : 56
+    user-017 : 44
+    user-018 : 46
+    user-019 : 54
+    user-020 : 47
+
+The dataset provides sufficient variation to test workload distribution.
+
+
+================================================================================
+7. STEP 07 — CREATE COSMOS DB EXPERIMENTAL ENVIRONMENT
+================================================================================
+
+The experimental environment used in this study is:
+
+    API:
+        Azure Cosmos DB for NoSQL
+
+    Region:
+        Central India
+
+    Database:
+        phishguard-study-db
+
+    Container:
+        scans
+
+    Partition key:
+        /userId
+
+    Provisioned throughput:
+        400 RU/s
+
+    Dataset:
+        Approximately 1,000 records
+
+    Users:
+        20
+
+
+================================================================================
+8. AZURE COSMOS DB CREATION 
+================================================================================
+
+Each team member who needs an independent experimental environment can create
+their own Cosmos DB account.
+
+STEP 1
+------
+
+Open:
+
+    Azure Portal
+
+Search for:
+
+    Azure Cosmos DB
+
+Select:
+
+    Azure Cosmos DB for NoSQL
+
+Click:
+
+    Create
+
+
+STEP 2 — BASIC CONFIGURATION
+----------------------------
+
+Subscription:
+
+    Azure for Students
+
+Resource Group:
+
+    phishguard-rg
+
+Account Name:
+
+    Use a globally unique name.
+
+Example:
+
+    phishguard-cosmos-team1
+
+or:
+
+    phishguard-cosmos-team2
+
+Region:
+
+    Central India
+
+API:
+
+    Azure Cosmos DB for NoSQL
+
+
+STEP 3 — CAPACITY
+-----------------
+
+Select:
+
+    Provisioned throughput
+
+For the baseline experiment:
+
+    400 RU/s
+
+If the Azure portal provides a Free Tier Discount option and the account is
+eligible, it may be enabled.
+
+The study does not require geo-redundancy or multi-region writes.
+
+
+STEP 4 — CREATE ACCOUNT
+-----------------------
+
+Review the configuration.
+
+Click:
+
+    Review + create
+
+Then:
+
+    Create
+
+Wait until the Cosmos DB account becomes available.
+
+
+STEP 5 — CREATE DATABASE AND CONTAINER
+--------------------------------------
+
+Open the Cosmos DB account.
+
+Navigate to:
+
+    Data Explorer
+
+Create a new container.
+
+Database ID:
+
+    phishguard-study-db
+
+Container ID:
+
+    scans
+
+Partition key:
+
+    /userId
+
+Throughput:
+
+    400 RU/s
+
+
+IMPORTANT:
+
+The partition-key path must be:
+
+    /userId
+
+The partition key is defined when the container is created.
+
+Do not change it to /riskBand or /country for the baseline experiment.
+
+
+STEP 6 — VERIFY THE ENVIRONMENT
+-------------------------------
+
+The final configuration should be:
+
+    Cosmos DB Account
+        |
+        +-- phishguard-study-db
+              |
+              +-- scans
+                    |
+                    +-- Partition Key: /userId
+                    +-- Throughput: 400 RU/s
+
+
+STEP 7 — GET CONNECTION INFORMATION
+-----------------------------------
+
+Open:
+
+    Cosmos DB Account
+        -> Settings
+        -> Keys
+
+Obtain:
+
+    URI
+    PRIMARY KEY
+
+IMPORTANT:
+
+The primary key is a secret credential.
+
+Never commit it to GitHub.
+
+
+================================================================================
+9. STEP 08 — CONFIGURE THE LOCAL ENVIRONMENT
+================================================================================
+
+The repository contains:
+
+    .env.example
+
+Create a local file:
+
+    .env
+
+Use:
+
+    COSMOS_ENDPOINT=https://YOUR-COSMOS-ACCOUNT.documents.azure.com:443/
+    COSMOS_KEY=YOUR_PRIMARY_KEY
+
+    COSMOS_DATABASE=phishguard-study-db
+    COSMOS_CONTAINER=scans
+
+
+IMPORTANT:
+
+The .env file is intentionally excluded from Git.
+
+Never upload:
+
+    .env
+    Cosmos DB primary keys
+    Connection strings containing credentials
+
+
+================================================================================
+10. STEP 08 — NORMAL WORKLOAD EXPERIMENT
+================================================================================
+
+Script:
+
+    normal_workload.py
+
+Workload:
+
+    Total requests : 500
+    Users          : 20
+    Partition key  : /userId
+
+Requests were randomly distributed across the 20 users.
+
+Observed results:
+
+    Total requests : 500
+    Successful     : 500
+    Throttled      : 0
+    Average latency: 58.14 ms
+
+The request distribution was reasonably balanced.
+
+This experiment establishes the baseline behavior of the initial /userId
+partition-key design.
+
+
+================================================================================
+11. STEP 09 — SKEWED / HOT WORKLOAD EXPERIMENT
+================================================================================
+
+Script:
+
+    hot_workload.py
+
+The workload was intentionally skewed.
+
+Total requests:
+
+    500
+
+Requests directed to user-001:
+
+    400
+
+Requests directed to other users:
+
+    100
+
+Therefore:
+
+    user-001 = 80% of total requests
+
+
+Observed results:
+
+    Total requests : 500
+    Successful     : 500
+    Throttled      : 0
+    Other errors   : 0
+    Average latency: 51.34 ms
+    Average RU     : 3.09 RU/request
+
+
+================================================================================
+12. STEP 09 — REQUEST DISTRIBUTION
+================================================================================
+
+The skewed experiment produced the following major distribution:
+
+    user-001 : 400 requests
+    Other users: 100 requests
+
+Therefore:
+
+    user-001 received 80% of all requests.
+
+
+IMPORTANT INTERPRETATION:
+
+This demonstrates severe workload skew toward a single logical partition
+key value.
+
+It does NOT by itself prove physical hot-partition contention.
+
+
+================================================================================
+13. HOT PARTITION ANALYSIS
+================================================================================
+
+Workload skew:
+
+    A disproportionate amount of traffic is directed toward one partition-key
+    value.
+
+Hot logical partition:
+
+    A logical partition receiving disproportionately high workload.
+
+Physical hot-partition contention:
+
+    Requires evidence that the workload is creating contention at the
+    physical-partition level.
+
+HTTP 429:
+
+    Indicates that the available throughput was insufficient to immediately
+    serve a request.
+
+RU:
+
+    RU/s represents provisioned throughput capacity.
+
+RU/request:
+
+    Represents the resource charge of an individual database operation.
+
+
+IMPORTANT:
+
+    Workload skew
+    !=
+    Hot physical partition
+    !=
+    Throttling
+
+
+The terms are related but should not be treated as interchangeable.
+
+
+================================================================================
+14. EXPERIMENTAL FINDING
+================================================================================
+
+The skewed experiment demonstrated:
+
+    80% of requests -> user-001
+
+However:
+
+    500 total requests
+    500 successful
+    0 throttled
+
+Therefore, the correct engineering conclusion is:
+
+"The experiment demonstrated severe workload skew toward a single logical
+partition. However, under the tested 500-request workload and configured
+throughput, no throttling occurred, so physical hot-partition contention was
+not conclusively demonstrated."
+
+
+A lower average latency in the skewed experiment should NOT be interpreted as
+evidence that workload skew improves performance.
+
+Latency can vary between experiment runs because of multiple environmental
+and execution factors.
+
+
+================================================================================
+15. STEP 10 — IDENTIFY THE BOTTLENECK
+================================================================================
+
+A bottleneck is a component whose available capacity limits the workload.
+
+Conceptually:
+
+    Increasing workload
+            |
+            v
+    Increasing resource demand
+            |
+            v
+    Available throughput becomes limiting
+            |
+            v
+    Increased latency / throttling risk
+
+
+The current 500-request experiment did not exhaust the configured throughput.
+
+
+================================================================================
+16. STEP 11 — CONTROLLED STRESS TEST
+================================================================================
+
+The next experiment should progressively increase workload.
+
+Recommended sequence:
+
+    500 requests
+        |
+    1000 requests
+        |
+    2000 requests
+        |
+    Higher levels if required
+
+Maintain approximately:
+
+    80% -> user-001
+    20% -> other users
+
+
+Measure at every workload level:
+
+    Average latency
+    RU/request
+    Successful requests
+    HTTP 429 responses
+    Request distribution
+    Throughput behavior
+
+
+The purpose is to determine whether increased demand produces measurable
+contention or throttling.
+
+
+================================================================================
+17. STEP 12 — COMPARE PARTITION-KEY DESIGNS
+================================================================================
+
+After the stress testing stage, candidate partition-key designs can be
+evaluated:
+
+    /userId
+    /riskBand
+    /country
+
+Comparison dimensions:
+
+    Application access patterns
+    Cardinality
+    Data distribution
+    Workload distribution
+    Query behavior
+    RU consumption
+    Latency
+    Throttling
+    Hot-partition risk
+
+
+IMPORTANT:
+
+A partition key should not be selected based on cardinality alone.
+
+
+================================================================================
+18. STEP 13 — ENGINEERING DECISION
+================================================================================
+
+The partition-key decision should be based on measured evidence.
+
+Decision workflow:
+
+    Access Pattern
+          |
+          v
+    Candidate Key
+          |
+          v
+    Data Distribution
+          |
+          v
+    Workload Distribution
+          |
+          v
+    Controlled Load
+          |
+          v
+    Latency / RU / 429
+          |
+          v
+    Partition-Key Evaluation
+
+
+Changing a partition key is not an ordinary runtime configuration change.
+
+The partition-key path is defined as part of the container design.
+
+If a different partition-key design is required, a new container and data
+migration/re-ingestion may be necessary.
+
+
+================================================================================
+19. STEP 14 — FINAL ENGINEERING CONCLUSION
+================================================================================
+
+The study follows a measurement-driven approach to partition-key design.
+
+We are not selecting a partition key based on theory alone.
+
+Instead, the design is evaluated using:
+
+    Realistic application data
+          |
+    Real application access patterns
+          |
+    Candidate partition keys
+          |
+    Controlled workloads
+          |
+    Performance measurements
+          |
+    Stress testing
+          |
+    Engineering decision
+
+
+FINAL CONCLUSION:
+
+"We are not selecting a partition key based on theory alone; we are
+validating the design using realistic workloads, controlled stress testing,
+and measurable performance data."
+
+
+================================================================================
+20. PROJECT FILES
+================================================================================
+
+Current repository structure:
+
+    README.md
+    requirements.txt
+    .env.example
+    .gitignore
+
+    generate_scand.py
+    normal_workload.py
+    hot_workload.py
+
+    docs/
+        STEP_04_TO_14_EXPERIMENT_AND_AZURE_SETUP.txt
+
+
+================================================================================
+21. RUNNING THE PROJECT
+================================================================================
+
+Install dependencies:
+
+    pip install -r requirements.txt
+
+
+Generate scan data:
+
+    python generate_scand.py
+
+
+Run normal workload:
+
+    python normal_workload.py
+
+
+Run skewed workload:
+
+    python hot_workload.py
+
+
+================================================================================
+22. SECURITY RULES
+================================================================================
+
+NEVER commit:
+
+    .env
+    Cosmos DB primary keys
+    API keys
+    Passwords
+    Access tokens
+    Private connection strings
+
+
+The repository intentionally contains:
+
+    .env.example
+
+The actual .env file remains local.
+
+
+================================================================================
+23. REPRODUCIBILITY
+================================================================================
+
+A team member should be able to reproduce the experiment using this workflow:
+
+    1. Clone the GitHub repository.
+    2. Install Python dependencies.
+    3. Create an Azure Cosmos DB for NoSQL account.
+    4. Create phishguard-study-db.
+    5. Create scans container.
+    6. Configure /userId as the partition key.
+    7. Configure the required throughput.
+    8. Create a local .env file.
+    9. Generate the dataset.
+   10. Run the normal workload.
+   11. Run the skewed workload.
+   12. Record latency, RU, success, and throttling.
+   13. Perform controlled stress testing.
+   14. Compare candidate partition-key designs.
+
+
+================================================================================
+END OF DOCUMENT
+================================================================================
